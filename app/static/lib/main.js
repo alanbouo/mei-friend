@@ -1,19 +1,14 @@
 // ── SoloSuite bridge — early listener ────────────────────────────────────────
-// Installed immediately at module load so messages sent before completeInitialLoad()
-// are captured and applied once the editor is ready.
+// Captures incoming MusicXML immediately at module load.
+// Applied in vrvWorkerEventsHandler 'vrvLoaded' once Verovio is ready,
+// overriding the default/stored file.
 let _pendingMusicXML = null;
 window.addEventListener('message', (event) => {
   if (event.data?.type !== 'load-musicxml') return;
   const content = event.data.content;
   if (!content || typeof content !== 'string') return;
   _pendingMusicXML = { content, filename: event.data.filename || 'score.xml' };
-  // If the editor is already initialised, load immediately
-  if (typeof handleEncoding === 'function' && cm) {
-    meiFileName = _pendingMusicXML.filename;
-    handleEncoding(_pendingMusicXML.content, true, true, true);
-    setFileChangedState(false);
-    _pendingMusicXML = null;
-  }
+  console.log('[bridge] MusicXML queued, waiting for vrvLoaded');
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -881,14 +876,6 @@ async function completeInitialLoad() {
     }
     gm.clone();
   }
-  // ── SoloSuite bridge — apply any content received before init finished ──
-  if (_pendingMusicXML) {
-    meiFileName = _pendingMusicXML.filename;
-    handleEncoding(_pendingMusicXML.content, true, true, true);
-    setFileChangedState(false);
-    console.log('[bridge] MusicXML applied from pending queue');
-    _pendingMusicXML = null;
-  }
 } // completeInitialLoad()
 
 export async function openUrlFetch(url = '', updateAfterLoading = true) {
@@ -1044,7 +1031,15 @@ async function vrvWorkerEventsHandler(ev) {
       document.getElementById('statusBar').innerHTML = `Verovio ${tkVersion} ${translator.lang.verovioLoaded.text}.`;
       setBreaksOptions(tkAvailableOptions, defaultVerovioOptions.breaks);
       setChoiceOptions('');
-      if (!storage.supported || !meiFileName) {
+      if (_pendingMusicXML) {
+        // SoloSuite bridge: load incoming MusicXML instead of default/stored file
+        const pending = _pendingMusicXML;
+        _pendingMusicXML = null;
+        meiFileName = pending.filename;
+        handleEncoding(pending.content, true, true, true);
+        setFileChangedState(false);
+        console.log('[bridge] MusicXML loaded from pending queue at vrvLoaded');
+      } else if (!storage.supported || !meiFileName) {
         // open default mei file
         openFile();
       } else {
