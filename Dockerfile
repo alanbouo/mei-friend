@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy repo
 COPY . .
 
-# Initialize and build CodeMirror submodule
-RUN git submodule update --init --recursive
+# Clone CodeMirror submodule (git context unavailable in Docker build)
+RUN git clone https://github.com/codemirror/codemirror5 app/static/CodeMirror
 RUN cd app/static/CodeMirror && npm install rollup && npm run build
 
 # Python dependencies
