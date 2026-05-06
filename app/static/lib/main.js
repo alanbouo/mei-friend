@@ -1666,17 +1666,11 @@ let _saveAndReturnCallback = null;
 
 export let cmd = {
   saveAndReturn: () => {
-    _saveAndReturnCallback = (musicXML, error) => {
-      _saveAndReturnCallback = null;
-      if (error) {
-        console.error('[bridge] MusicXML export failed:', error);
-        return;
-      }
-      window.parent.postMessage({ type: 'file-saved', content: musicXML }, '*');
-      console.log('[bridge] MusicXML sent to parent');
-      setFileChangedState(false);
-    };
-    vrvWorker.postMessage({ cmd: 'getMusicXML' });
+    // Send MEI directly from CodeMirror — no worker needed
+    const meiContent = cm.getValue();
+    window.parent.postMessage({ type: 'file-saved', content: meiContent, format: 'mei' }, '*');
+    console.log('[bridge] MEI sent to parent (' + meiContent.length + ' chars)');
+    setFileChangedState(false);
   },
   fileNameChange: () => {
     if (fileLocationType === 'file') {
