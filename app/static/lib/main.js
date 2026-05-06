@@ -862,6 +862,18 @@ async function completeInitialLoad() {
     }
     gm.clone();
   }
+  // ── SoloSuite postMessage bridge ─────────────────────────────────────────
+  // Listen for incoming MusicXML from parent iframe
+  window.addEventListener('message', (event) => {
+    if (!event.data || event.data.type !== 'load-musicxml') return;
+    const content = event.data.content;
+    if (!content || typeof content !== 'string') return;
+    // Set a temporary filename so handleEncoding detects the XML format
+    meiFileName = event.data.filename || 'score.xml';
+    handleEncoding(content, true, true, true);
+    setFileChangedState(false);
+    console.log('[bridge] MusicXML loaded from parent');
+  });
 } // completeInitialLoad()
 
 export async function openUrlFetch(url = '', updateAfterLoading = true) {
@@ -1209,6 +1221,11 @@ async function vrvWorkerEventsHandler(ev) {
       document.getElementById('verovio-panel').innerHTML =
         '<h3>Invalid MEI in ' + meiFileName + ' (' + ev.data.msg + ')</h3>';
       v.busy(false);
+      break;
+    case 'musicXMLExported':
+      if (_saveAndReturnCallback) {
+        _saveAndReturnCallback(ev.data.musicXML || null, ev.data.error || null);
+      }
       break;
   }
   // cm.blockChanges = false;
@@ -1634,7 +1651,23 @@ function encloseSelectionWithLastTag() {
 }
 
 // object of interface command functions for buttons and key bindings
+// Callback stored while waiting for worker MusicXML export
+let _saveAndReturnCallback = null;
+
 export let cmd = {
+  saveAndReturn: () => {
+    _saveAndReturnCallback = (musicXML, error) => {
+      _saveAndReturnCallback = null;
+      if (error) {
+        console.error('[bridge] MusicXML export failed:', error);
+        return;
+      }
+      window.parent.postMessage({ type: 'file-saved', content: musicXML }, '*');
+      console.log('[bridge] MusicXML sent to parent');
+      setFileChangedState(false);
+    };
+    vrvWorker.postMessage({ cmd: 'getMusicXML' });
+  },
   fileNameChange: () => {
     if (fileLocationType === 'file') {
       meiFileName = document.getElementById('fileName').innerText;
@@ -2056,6 +2089,8 @@ function addEventListeners(v, cm) {
   document.getElementById('importMusicXml').addEventListener('click', cmd.openMusicXml);
   document.getElementById('importHumdrum').addEventListener('click', cmd.openHumdrum);
   document.getElementById('importPae').addEventListener('click', cmd.openPae);
+  const saveAndReturnBtn = document.getElementById('saveAndReturn');
+  if (saveAndReturnBtn) saveAndReturnBtn.addEventListener('click', cmd.saveAndReturn);
   document.getElementById('saveMei').addEventListener('click', cmd.downloadMei);
   document.getElementById('saveMeiBasic').addEventListener('click', cmd.downloadMeiBasic);
   document.getElementById('saveSvg').addEventListener('click', downloadSvg);

@@ -345,6 +345,16 @@ addEventListener(
         result.cmd = 'meiBasicExported';
         result.toolkitDataOutdated = true;
         break;
+      case 'getMusicXML':
+        // Export current toolkit data as MusicXML (used by Save & Return bridge)
+        try {
+          result.musicXML = tk.getMusicXML();
+          result.cmd = 'musicXMLExported';
+        } catch (err) {
+          result.cmd = 'musicXMLExported';
+          result.error = err.toString();
+        }
+        break;
       case 'renderPdf':
         if (typeof PDFDocument === 'undefined') {
           // importScripts('https://github.com/foliojs/pdfkit/releases/download/v0.12.1/pdfkit.standalone.js');
