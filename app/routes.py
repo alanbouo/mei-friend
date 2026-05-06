@@ -170,6 +170,11 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    # Allow embedding in iframe from any origin (required for SoloSuite integration)
+    embed_origin = getenv('EMBED_ORIGIN', '*')
+    response.headers['Content-Security-Policy'] = f"frame-ancestors {embed_origin}"
+    # Remove X-Frame-Options if set (conflicts with CSP frame-ancestors)
+    response.headers.remove('X-Frame-Options')
     return response
 
 if __name__ == '__main__':

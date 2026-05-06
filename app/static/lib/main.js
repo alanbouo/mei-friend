@@ -1,3 +1,22 @@
+// ── SoloSuite bridge — early listener ────────────────────────────────────────
+// Installed immediately at module load so messages sent before completeInitialLoad()
+// are captured and applied once the editor is ready.
+let _pendingMusicXML = null;
+window.addEventListener('message', (event) => {
+  if (event.data?.type !== 'load-musicxml') return;
+  const content = event.data.content;
+  if (!content || typeof content !== 'string') return;
+  _pendingMusicXML = { content, filename: event.data.filename || 'score.xml' };
+  // If the editor is already initialised, load immediately
+  if (typeof handleEncoding === 'function' && cm) {
+    meiFileName = _pendingMusicXML.filename;
+    handleEncoding(_pendingMusicXML.content, true, true, true);
+    setFileChangedState(false);
+    _pendingMusicXML = null;
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 // mei-friend version and date
 export const version = '1.2.9';
 export const versionDate = '15 September 2025'; // use full or 3-character english months, will be translated
@@ -862,18 +881,14 @@ async function completeInitialLoad() {
     }
     gm.clone();
   }
-  // ── SoloSuite postMessage bridge ─────────────────────────────────────────
-  // Listen for incoming MusicXML from parent iframe
-  window.addEventListener('message', (event) => {
-    if (!event.data || event.data.type !== 'load-musicxml') return;
-    const content = event.data.content;
-    if (!content || typeof content !== 'string') return;
-    // Set a temporary filename so handleEncoding detects the XML format
-    meiFileName = event.data.filename || 'score.xml';
-    handleEncoding(content, true, true, true);
+  // ── SoloSuite bridge — apply any content received before init finished ──
+  if (_pendingMusicXML) {
+    meiFileName = _pendingMusicXML.filename;
+    handleEncoding(_pendingMusicXML.content, true, true, true);
     setFileChangedState(false);
-    console.log('[bridge] MusicXML loaded from parent');
-  });
+    console.log('[bridge] MusicXML applied from pending queue');
+    _pendingMusicXML = null;
+  }
 } // completeInitialLoad()
 
 export async function openUrlFetch(url = '', updateAfterLoading = true) {
